@@ -225,6 +225,66 @@ internal static class HardwareAccelerated
 		/// </param>
 		/// <param name="inputLength">The number of elements to decode.</param>
 		/// <returns><see langword="true" /> if the values in <paramref name="msgpack"/> were all valid; otherwise, <see langword="false" />.</returns>
+		/// <summary>
+		/// Decodes a span of msgpack-encoded float32 values.
+		/// </summary>
+		/// <param name="output">The reference to the first element in a span where the decoded values should be written.</param>
+		/// <param name="msgpack">A reference to the first msgpack byte to decode.</param>
+		/// <param name="count">The number of elements to decode.</param>
+		/// <returns><see langword="true" /> if the values in <paramref name="msgpack"/> were all valid float32 msgpack values; otherwise, <see langword="false" />.</returns>
+		internal static bool ReadFloat32(ref float output, in byte msgpack, int count)
+		{
+			ref byte input = ref Unsafe.AsRef(in msgpack);
+			for (int i = 0; i < count; i++)
+			{
+				nuint offset = unchecked((nuint)i) * 5U;
+				if (Unsafe.Add(ref input, offset) != MessagePackCode.Float32)
+				{
+					return false;
+				}
+
+				uint raw = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref input, offset + 1U));
+				if (BitConverter.IsLittleEndian)
+				{
+					raw = BinaryPrimitives.ReverseEndianness(raw);
+				}
+
+				Unsafe.Add(ref output, i) = Unsafe.BitCast<uint, float>(raw);
+			}
+
+			return true;
+		}
+
+		/// <summary>
+		/// Decodes a span of msgpack-encoded float64 values.
+		/// </summary>
+		/// <param name="output">The reference to the first element in a span where the decoded values should be written.</param>
+		/// <param name="msgpack">A reference to the first msgpack byte to decode.</param>
+		/// <param name="count">The number of elements to decode.</param>
+		/// <returns><see langword="true" /> if the values in <paramref name="msgpack"/> were all valid float64 msgpack values; otherwise, <see langword="false" />.</returns>
+		internal static bool ReadFloat64(ref double output, in byte msgpack, int count)
+		{
+			ref byte input = ref Unsafe.AsRef(in msgpack);
+			for (int i = 0; i < count; i++)
+			{
+				nuint offset = unchecked((nuint)i) * 9U;
+				if (Unsafe.Add(ref input, offset) != MessagePackCode.Float64)
+				{
+					return false;
+				}
+
+				ulong raw = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref input, offset + 1U));
+				if (BitConverter.IsLittleEndian)
+				{
+					raw = BinaryPrimitives.ReverseEndianness(raw);
+				}
+
+				Unsafe.Add(ref output, i) = Unsafe.BitCast<ulong, double>(raw);
+			}
+
+			return true;
+		}
+
 		internal static bool Read(ref bool output, in byte msgpack, int inputLength)
 		{
 			ref byte input = ref Unsafe.AsRef(in msgpack);
@@ -918,43 +978,74 @@ internal static class HardwareAccelerated
 					break;
 			}
 
-			for (int i = 0; i < span.Length; i++)
+			if (typeof(TElement) == typeof(float))
 			{
-				if (typeof(TElement) == typeof(ushort))
+				// Batch read: float32 is always 5 bytes (0xCA + 4 big-endian bytes)
+				RawMessagePack sequence = reader.ReadRaw((long)count * 5);
+				Span<float> floatSpan = MemoryMarshal.Cast<TElement, float>(span);
+				foreach (ReadOnlyMemory<byte> segment in sequence.MsgPack)
 				{
-					Unsafe.As<TElement, ushort>(ref span[i]) = reader.ReadUInt16();
+					int elementsInSegment = segment.Length / 5;
+					if (!MessagePackPrimitiveSpanUtility.ReadFloat32(ref MemoryMarshal.GetReference(floatSpan), in MemoryMarshal.GetReference(segment.Span), elementsInSegment))
+					{
+						throw new MessagePackSerializationException("Not all elements were float32 msgpack values.");
+					}
+
+					floatSpan = floatSpan[elementsInSegment..];
 				}
-				else if (typeof(TElement) == typeof(uint))
+			}
+			else if (typeof(TElement) == typeof(double))
+			{
+				// Batch read: float64 is always 9 bytes (0xCB + 8 big-endian bytes)
+				RawMessagePack sequence = reader.ReadRaw((long)count * 9);
+				Span<double> doubleSpan = MemoryMarshal.Cast<TElement, double>(span);
+				foreach (ReadOnlyMemory<byte> segment in sequence.MsgPack)
 				{
-					Unsafe.As<TElement, uint>(ref span[i]) = reader.ReadUInt32();
+					int elementsInSegment = segment.Length / 9;
+					if (!MessagePackPrimitiveSpanUtility.ReadFloat64(ref MemoryMarshal.GetReference(doubleSpan), in MemoryMarshal.GetReference(segment.Span), elementsInSegment))
+					{
+						throw new MessagePackSerializationException("Not all elements were float64 msgpack values.");
+					}
+
+					doubleSpan = doubleSpan[elementsInSegment..];
 				}
-				else if (typeof(TElement) == typeof(ulong))
+			}
+			else
+			{
+				for (int i = 0; i < span.Length; i++)
 				{
-					Unsafe.As<TElement, ulong>(ref span[i]) = reader.ReadUInt64();
-				}
-				else if (typeof(TElement) == typeof(sbyte))
-				{
-					Unsafe.As<TElement, sbyte>(ref span[i]) = reader.ReadSByte();
-				}
-				else if (typeof(TElement) == typeof(short))
-				{
-					Unsafe.As<TElement, short>(ref span[i]) = reader.ReadInt16();
-				}
-				else if (typeof(TElement) == typeof(int))
-				{
-					Unsafe.As<TElement, int>(ref span[i]) = reader.ReadInt32();
-				}
-				else if (typeof(TElement) == typeof(long))
-				{
-					Unsafe.As<TElement, long>(ref span[i]) = reader.ReadInt64();
-				}
-				else if (typeof(TElement) == typeof(float))
-				{
-					Unsafe.As<TElement, float>(ref span[i]) = reader.ReadSingle();
-				}
-				else
-				{
-					Unsafe.As<TElement, double>(ref span[i]) = reader.ReadDouble();
+					if (typeof(TElement) == typeof(ushort))
+					{
+						Unsafe.As<TElement, ushort>(ref span[i]) = reader.ReadUInt16();
+					}
+					else if (typeof(TElement) == typeof(uint))
+					{
+						Unsafe.As<TElement, uint>(ref span[i]) = reader.ReadUInt32();
+					}
+					else if (typeof(TElement) == typeof(ulong))
+					{
+						Unsafe.As<TElement, ulong>(ref span[i]) = reader.ReadUInt64();
+					}
+					else if (typeof(TElement) == typeof(sbyte))
+					{
+						Unsafe.As<TElement, sbyte>(ref span[i]) = reader.ReadSByte();
+					}
+					else if (typeof(TElement) == typeof(short))
+					{
+						Unsafe.As<TElement, short>(ref span[i]) = reader.ReadInt16();
+					}
+					else if (typeof(TElement) == typeof(int))
+					{
+						Unsafe.As<TElement, int>(ref span[i]) = reader.ReadInt32();
+					}
+					else if (typeof(TElement) == typeof(long))
+					{
+						Unsafe.As<TElement, long>(ref span[i]) = reader.ReadInt64();
+					}
+					else
+					{
+						throw new NotSupportedException($"Unsupported element type: {typeof(TElement)}");
+					}
 				}
 			}
 
