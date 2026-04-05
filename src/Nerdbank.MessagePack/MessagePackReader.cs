@@ -310,6 +310,7 @@ public ref partial struct MessagePackReader
 	/// Reads a boolean value from either a <see cref="MessagePackCode.False"/> or <see cref="MessagePackCode.True"/>.
 	/// </summary>
 	/// <returns>The value.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public bool ReadBoolean()
 	{
 		switch (this.streamingReader.TryRead(out bool value))
@@ -350,6 +351,7 @@ public ref partial struct MessagePackReader
 	/// or some value between <see cref="MessagePackCode.MinFixInt"/> and <see cref="MessagePackCode.MaxFixInt"/>.
 	/// </summary>
 	/// <returns>The value.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public unsafe float ReadSingle()
 	{
 		switch (this.streamingReader.TryRead(out float value))
@@ -381,6 +383,7 @@ public ref partial struct MessagePackReader
 	/// or some value between <see cref="MessagePackCode.MinFixInt"/> and <see cref="MessagePackCode.MaxFixInt"/>.
 	/// </summary>
 	/// <returns>The value.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public unsafe double ReadDouble()
 	{
 		switch (this.streamingReader.TryRead(out double value))

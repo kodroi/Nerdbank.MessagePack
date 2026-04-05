@@ -978,9 +978,23 @@ internal static class HardwareAccelerated
 					break;
 			}
 
+			if (!TryBatchRead(ref reader, span, count))
+			{
+				ReadElementwise(ref reader, span);
+			}
+
+			return enumerable;
+		}
+
+		/// <summary>
+		/// Attempts a fast batch read for fixed-size types (float/double).
+		/// Returns false if the encoding is not uniform, leaving the reader position unchanged.
+		/// </summary>
+		private static bool TryBatchRead(ref MessagePackReader reader, Span<TElement> span, int count)
+		{
 			if (typeof(TElement) == typeof(float))
 			{
-				// Batch read: float32 is always 5 bytes (0xCA + 4 big-endian bytes)
+				SequencePosition checkpoint = reader.Position;
 				RawMessagePack sequence = reader.ReadRaw((long)count * 5);
 				Span<float> floatSpan = MemoryMarshal.Cast<TElement, float>(span);
 				foreach (ReadOnlyMemory<byte> segment in sequence.MsgPack)
@@ -988,15 +1002,18 @@ internal static class HardwareAccelerated
 					int elementsInSegment = segment.Length / 5;
 					if (!MessagePackPrimitiveSpanUtility.ReadFloat32(ref MemoryMarshal.GetReference(floatSpan), in MemoryMarshal.GetReference(segment.Span), elementsInSegment))
 					{
-						throw new MessagePackSerializationException("Not all elements were float32 msgpack values.");
+						reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
+						return false;
 					}
 
 					floatSpan = floatSpan[elementsInSegment..];
 				}
+
+				return true;
 			}
 			else if (typeof(TElement) == typeof(double))
 			{
-				// Batch read: float64 is always 9 bytes (0xCB + 8 big-endian bytes)
+				SequencePosition checkpoint = reader.Position;
 				RawMessagePack sequence = reader.ReadRaw((long)count * 9);
 				Span<double> doubleSpan = MemoryMarshal.Cast<TElement, double>(span);
 				foreach (ReadOnlyMemory<byte> segment in sequence.MsgPack)
@@ -1004,52 +1021,64 @@ internal static class HardwareAccelerated
 					int elementsInSegment = segment.Length / 9;
 					if (!MessagePackPrimitiveSpanUtility.ReadFloat64(ref MemoryMarshal.GetReference(doubleSpan), in MemoryMarshal.GetReference(segment.Span), elementsInSegment))
 					{
-						throw new MessagePackSerializationException("Not all elements were float64 msgpack values.");
+						reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
+						return false;
 					}
 
 					doubleSpan = doubleSpan[elementsInSegment..];
 				}
-			}
-			else
-			{
-				for (int i = 0; i < span.Length; i++)
-				{
-					if (typeof(TElement) == typeof(ushort))
-					{
-						Unsafe.As<TElement, ushort>(ref span[i]) = reader.ReadUInt16();
-					}
-					else if (typeof(TElement) == typeof(uint))
-					{
-						Unsafe.As<TElement, uint>(ref span[i]) = reader.ReadUInt32();
-					}
-					else if (typeof(TElement) == typeof(ulong))
-					{
-						Unsafe.As<TElement, ulong>(ref span[i]) = reader.ReadUInt64();
-					}
-					else if (typeof(TElement) == typeof(sbyte))
-					{
-						Unsafe.As<TElement, sbyte>(ref span[i]) = reader.ReadSByte();
-					}
-					else if (typeof(TElement) == typeof(short))
-					{
-						Unsafe.As<TElement, short>(ref span[i]) = reader.ReadInt16();
-					}
-					else if (typeof(TElement) == typeof(int))
-					{
-						Unsafe.As<TElement, int>(ref span[i]) = reader.ReadInt32();
-					}
-					else if (typeof(TElement) == typeof(long))
-					{
-						Unsafe.As<TElement, long>(ref span[i]) = reader.ReadInt64();
-					}
-					else
-					{
-						throw new NotSupportedException($"Unsupported element type: {typeof(TElement)}");
-					}
-				}
+
+				return true;
 			}
 
-			return enumerable;
+			return false;
+		}
+
+		/// <summary>
+		/// Reads elements one at a time through the standard MessagePackReader path.
+		/// Handles all element types and mixed encodings.
+		/// </summary>
+		private static void ReadElementwise(ref MessagePackReader reader, Span<TElement> span)
+		{
+			for (int i = 0; i < span.Length; i++)
+			{
+				if (typeof(TElement) == typeof(ushort))
+				{
+					Unsafe.As<TElement, ushort>(ref span[i]) = reader.ReadUInt16();
+				}
+				else if (typeof(TElement) == typeof(uint))
+				{
+					Unsafe.As<TElement, uint>(ref span[i]) = reader.ReadUInt32();
+				}
+				else if (typeof(TElement) == typeof(ulong))
+				{
+					Unsafe.As<TElement, ulong>(ref span[i]) = reader.ReadUInt64();
+				}
+				else if (typeof(TElement) == typeof(sbyte))
+				{
+					Unsafe.As<TElement, sbyte>(ref span[i]) = reader.ReadSByte();
+				}
+				else if (typeof(TElement) == typeof(short))
+				{
+					Unsafe.As<TElement, short>(ref span[i]) = reader.ReadInt16();
+				}
+				else if (typeof(TElement) == typeof(int))
+				{
+					Unsafe.As<TElement, int>(ref span[i]) = reader.ReadInt32();
+				}
+				else if (typeof(TElement) == typeof(long))
+				{
+					Unsafe.As<TElement, long>(ref span[i]) = reader.ReadInt64();
+				}
+				else if (typeof(TElement) == typeof(float))
+				{
+					Unsafe.As<TElement, float>(ref span[i]) = reader.ReadSingle();
+				}
+				else
+				{
+					Unsafe.As<TElement, double>(ref span[i]) = reader.ReadDouble();
+				}
+			}
 		}
 
 		/// <inheritdoc/>
