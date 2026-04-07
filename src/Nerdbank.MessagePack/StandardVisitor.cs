@@ -788,7 +788,7 @@ internal class StandardVisitor : TypeShapeVisitor, ITypeShapeFunc
 #if NET
 					else if (!this.owner.DisableHardwareAcceleration &&
 						enumerableShape.ConstructionStrategy == CollectionConstructionStrategy.Parameterized &&
-						HardwareAccelerated.TryGetConverter<TEnumerable, TElement>(out converter))
+						HardwareAccelerated.TryGetConverter<TEnumerable, TElement>(out converter, this.owner.SerializeEnumValuesByName))
 					{
 						return ConverterResult.Ok(converter);
 					}
