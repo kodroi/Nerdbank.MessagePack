@@ -35,10 +35,11 @@ internal static class HardwareAccelerated
 	/// <typeparam name="TElement">The type of element.</typeparam>
 	/// <param name="converter">Receives the hardware-accelerated converter if one is available.</param>
 	/// <returns>A value indicating whether a converter is available.</returns>
-	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter, bool allowEnums = false)
+	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter)
 	{
-		// For enums, match on the underlying integer type instead.
-		Type elementType = typeof(TElement).IsEnum && allowEnums ? typeof(TElement).GetEnumUnderlyingType() : typeof(TElement);
+		// For enums, match on the underlying integer type (caller is responsible
+		// for not calling this when name-based enum serialization is configured).
+		Type elementType = typeof(TElement).IsEnum ? typeof(TElement).GetEnumUnderlyingType() : typeof(TElement);
 
 		Type enumerableType = typeof(TEnumerable);
 		SpanConstructorKind spanConstructorKind;
