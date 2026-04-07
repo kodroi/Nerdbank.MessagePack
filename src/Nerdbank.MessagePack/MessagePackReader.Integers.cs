@@ -9,6 +9,8 @@
 #pragma warning disable SA1121 // Simplify type syntax
 #pragma warning disable SA1601 // Partial elements should be documented
 
+using System.Runtime.CompilerServices;
+
 namespace Nerdbank.MessagePack;
 
 public ref partial struct MessagePackReader
@@ -21,6 +23,7 @@ public ref partial struct MessagePackReader
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public Byte ReadByte()
 	{
 		switch (this.streamingReader.TryRead(out Byte value))
@@ -45,6 +48,7 @@ public ref partial struct MessagePackReader
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public UInt16 ReadUInt16()
 	{
 		switch (this.streamingReader.TryRead(out UInt16 value))
@@ -69,6 +73,7 @@ public ref partial struct MessagePackReader
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public UInt32 ReadUInt32()
 	{
 		switch (this.streamingReader.TryRead(out UInt32 value))
@@ -93,6 +98,7 @@ public ref partial struct MessagePackReader
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public UInt64 ReadUInt64()
 	{
 		switch (this.streamingReader.TryRead(out UInt64 value))
@@ -117,6 +123,7 @@ public ref partial struct MessagePackReader
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public SByte ReadSByte()
 	{
 		switch (this.streamingReader.TryRead(out SByte value))
@@ -141,6 +148,7 @@ public ref partial struct MessagePackReader
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public Int16 ReadInt16()
 	{
 		switch (this.streamingReader.TryRead(out Int16 value))
@@ -165,6 +173,7 @@ public ref partial struct MessagePackReader
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public Int32 ReadInt32()
 	{
 		switch (this.streamingReader.TryRead(out Int32 value))
@@ -189,6 +198,7 @@ public ref partial struct MessagePackReader
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public Int64 ReadInt64()
 	{
 		switch (this.streamingReader.TryRead(out Int64 value))
