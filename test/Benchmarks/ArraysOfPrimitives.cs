@@ -101,9 +101,69 @@ public partial class ArraysOfPrimitives
 		return values;
 	}
 
+	private static readonly int[] SmallIntValues = GetSmallInts(Length);
+	private static readonly byte[] SmallIntValuesMsgPack = TestSerializer.Serialize<int[], Witness>(SmallIntValues);
+	private static readonly int[] FullRangeIntValues = GetFullRangeInts(Length);
+	private static readonly byte[] FullRangeIntValuesMsgPack = TestSerializer.Serialize<int[], Witness>(FullRangeIntValues);
+
+	[Benchmark]
+	[BenchmarkCategory("int-small", "deserialize")]
+	public int[]? SmallInt_Deserialize()
+	{
+		return this.Serializer.Deserialize<int[], Witness>(SmallIntValuesMsgPack);
+	}
+
+	[Benchmark]
+	[BenchmarkCategory("int-fullrange", "deserialize")]
+	public int[]? FullRangeInt_Deserialize()
+	{
+		return this.Serializer.Deserialize<int[], Witness>(FullRangeIntValuesMsgPack);
+	}
+
+	[Benchmark]
+	[BenchmarkCategory("int-small", "serialize")]
+	public void SmallInt_Serialize()
+	{
+		this.Serializer.Serialize<int[], Witness>(this.buffer, SmallIntValues);
+		this.buffer.Reset();
+	}
+
+	[Benchmark]
+	[BenchmarkCategory("int-fullrange", "serialize")]
+	public void FullRangeInt_Serialize()
+	{
+		this.Serializer.Serialize<int[], Witness>(this.buffer, FullRangeIntValues);
+		this.buffer.Reset();
+	}
+
+	private static int[] GetSmallInts(int length)
+	{
+		Random random = new Random(123);
+		int[] values = new int[length];
+		for (int i = 0; i < values.Length; i++)
+		{
+			values[i] = random.Next(0, 128); // all positive fixint (0-127)
+		}
+
+		return values;
+	}
+
+	private static int[] GetFullRangeInts(int length)
+	{
+		Random random = new Random(123);
+		int[] values = new int[length];
+		for (int i = 0; i < values.Length; i++)
+		{
+			values[i] = random.Next(int.MinValue, int.MaxValue);
+		}
+
+		return values;
+	}
+
 	[GenerateShapeFor<bool[]>]
 	[GenerateShapeFor<float[]>]
 	[GenerateShapeFor<double[]>]
+	[GenerateShapeFor<int[]>]
 	private partial class Witness;
 }
 
