@@ -1012,55 +1012,30 @@ internal static class HardwareAccelerated
 				return TryBatchReadFixed(ref reader, MemoryMarshal.Cast<TElement, double>(span), count, 9, MessagePackPrimitiveSpanUtility.ReadFloat64);
 			}
 
-			// Integer types: try fixint batch path (each element is 1 byte, value 0x00-0x7F).
-			// Fixint bytes ARE the value. Zero the span, then write each byte at offset 0
-			// of each element (works on little-endian; on big-endian, write at last byte).
+			// Integer types: fixint batch path. Each fixint is 1 byte (value 0x00-0x7F).
+			return TryBatchReadFixed(ref reader, span, count, 1, ReadPositiveFixInt);
+
+			// Validates all bytes are fixint, then widens each byte to TElement.
+			static bool ReadPositiveFixInt(ref TElement output, in byte msgpack, int elemCount)
 			{
-				SequencePosition checkpoint = reader.Position;
-				RawMessagePack sequence = reader.ReadRaw(count);
-				ReadOnlySpan<byte> raw;
-				byte[]? rented = null;
-				if (sequence.MsgPack.IsSingleSegment)
+				if (!MessagePackPrimitiveSpanUtility.AllPositiveFixInt(in msgpack, elemCount))
 				{
-					raw = sequence.MsgPack.FirstSpan;
-				}
-				else
-				{
-					rented = ArrayPool<byte>.Shared.Rent(count);
-					sequence.MsgPack.CopyTo(rented);
-					raw = rented.AsSpan(0, count);
+					return false;
 				}
 
-				try
+				ref byte src = ref Unsafe.AsRef(in msgpack);
+				Span<TElement> dest = MemoryMarshal.CreateSpan(ref output, elemCount);
+				MemoryMarshal.AsBytes(dest).Clear();
+				int stride = Unsafe.SizeOf<TElement>();
+				ref byte destBytes = ref MemoryMarshal.GetReference(MemoryMarshal.AsBytes(dest));
+				int byteOffset = BitConverter.IsLittleEndian ? 0 : stride - 1;
+				for (int i = 0; i < elemCount; i++)
 				{
-					if (!MessagePackPrimitiveSpanUtility.AllPositiveFixInt(in MemoryMarshal.GetReference(raw), count))
-					{
-						reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
-						return false;
-					}
-
-					// Zero the target span then write each fixint byte at the low byte of each element.
-					MemoryMarshal.AsBytes(span).Clear();
-					int stride = Unsafe.SizeOf<TElement>();
-					ref byte dest = ref MemoryMarshal.GetReference(MemoryMarshal.AsBytes(span));
-					int offset = BitConverter.IsLittleEndian ? 0 : stride - 1;
-					for (int i = 0; i < count; i++)
-					{
-						Unsafe.Add(ref dest, (i * stride) + offset) = raw[i];
-					}
-
-					return true;
+					Unsafe.Add(ref destBytes, (i * stride) + byteOffset) = Unsafe.Add(ref src, i);
 				}
-				finally
-				{
-					if (rented is not null)
-					{
-						ArrayPool<byte>.Shared.Return(rented);
-					}
-				}
+
+				return true;
 			}
-
-			return false;
 		}
 
 		/// <summary>
