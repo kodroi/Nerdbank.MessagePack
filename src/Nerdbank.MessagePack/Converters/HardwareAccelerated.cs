@@ -3,6 +3,7 @@
 
 #if NET
 
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
@@ -1140,21 +1141,40 @@ internal static class HardwareAccelerated
 		private static bool TryBatchReadFixed<T>(ref MessagePackReader reader, Span<T> span, int count, int bytesPerElement, BatchDecoder<T> decoder)
 		{
 			SequencePosition checkpoint = reader.Position;
-			RawMessagePack sequence = reader.ReadRaw((long)count * bytesPerElement);
-			Span<T> remaining = span;
-			foreach (ReadOnlyMemory<byte> segment in sequence.MsgPack)
+			long totalBytes = (long)count * bytesPerElement;
+			RawMessagePack sequence = reader.ReadRaw(totalBytes);
+
+			// Fast path: single contiguous segment (common case)
+			if (sequence.MsgPack.IsSingleSegment)
 			{
-				int elementsInSegment = segment.Length / bytesPerElement;
-				if (!decoder(ref MemoryMarshal.GetReference(remaining), in MemoryMarshal.GetReference(segment.Span), elementsInSegment))
+				if (!decoder(ref MemoryMarshal.GetReference(span), in MemoryMarshal.GetReference(sequence.MsgPack.FirstSpan), count))
 				{
 					reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
 					return false;
 				}
 
-				remaining = remaining[elementsInSegment..];
+				return true;
 			}
 
-			return true;
+			// Multi-segment: copy to contiguous buffer to avoid split-element bugs.
+			// ReadOnlySequence segments can split mid-element (e.g. a float's 5 bytes
+			// across two segments), so we can't process per-segment.
+			byte[] buffer = ArrayPool<byte>.Shared.Rent((int)totalBytes);
+			try
+			{
+				sequence.MsgPack.CopyTo(buffer);
+				if (!decoder(ref MemoryMarshal.GetReference(span), in MemoryMarshal.GetReference(buffer.AsSpan()), count))
+				{
+					reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
+					return false;
+				}
+
+				return true;
+			}
+			finally
+			{
+				ArrayPool<byte>.Shared.Return(buffer);
+			}
 		}
 
 		/// <summary>
