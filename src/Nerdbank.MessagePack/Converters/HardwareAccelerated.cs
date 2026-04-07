@@ -111,6 +111,52 @@ internal static class HardwareAccelerated
 			return true;
 		}
 
+		// Enums backed by integer types have identical memory layout to their underlying type.
+		if (typeof(TElement).IsEnum)
+		{
+			Type underlying = typeof(TElement).GetEnumUnderlyingType();
+			if (underlying == typeof(int))
+			{
+				converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, int>(spanConstructorKind);
+				return true;
+			}
+			else if (underlying == typeof(byte))
+			{
+				converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, byte>(spanConstructorKind);
+				return true;
+			}
+			else if (underlying == typeof(long))
+			{
+				converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, long>(spanConstructorKind);
+				return true;
+			}
+			else if (underlying == typeof(short))
+			{
+				converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, short>(spanConstructorKind);
+				return true;
+			}
+			else if (underlying == typeof(uint))
+			{
+				converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, uint>(spanConstructorKind);
+				return true;
+			}
+			else if (underlying == typeof(ulong))
+			{
+				converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, ulong>(spanConstructorKind);
+				return true;
+			}
+			else if (underlying == typeof(sbyte))
+			{
+				converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, sbyte>(spanConstructorKind);
+				return true;
+			}
+			else if (underlying == typeof(ushort))
+			{
+				converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, ushort>(spanConstructorKind);
+				return true;
+			}
+		}
+
 		converter = null;
 		return false;
 	}
