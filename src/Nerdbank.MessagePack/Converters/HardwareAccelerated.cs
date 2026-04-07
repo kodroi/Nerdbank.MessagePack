@@ -35,7 +35,7 @@ internal static class HardwareAccelerated
 	/// <typeparam name="TElement">The type of element.</typeparam>
 	/// <param name="converter">Receives the hardware-accelerated converter if one is available.</param>
 	/// <returns>A value indicating whether a converter is available.</returns>
-	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter, bool serializeEnumValuesByName = false)
+	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter, bool serializeEnumValuesByName)
 	{
 		Type enumerableType = typeof(TEnumerable);
 		SpanConstructorKind spanConstructorKind;

@@ -146,6 +146,77 @@ public partial class ArraysOfPrimitivesTests : MessagePackSerializerTestBase
 	private static int[] GetInterestingLengthsHelper<T>() => [-1, 0, 4, 100, 10_000];
 #endif
 
+	[Fact]
+	public void SmallIntArray_Fixint()
+	{
+		// All values in fixint range (0-127) — exercises the batch fixint read path
+		int[] values = Enumerable.Range(0, 1000).Select(i => i % 128).ToArray();
+		this.Roundtrip<int[], Witness>(values);
+	}
+
+	[Fact]
+	public void FloatArray_Roundtrip()
+	{
+		// Exercises the batch ReadFloat32 path
+		float[] values = Enumerable.Range(0, 1000).Select(i => i * 0.5f).ToArray();
+		this.Roundtrip<float[], Witness>(values);
+	}
+
+	[Fact]
+	public void DoubleArray_Roundtrip()
+	{
+		// Exercises the batch ReadFloat64 path
+		double[] values = Enumerable.Range(0, 1000).Select(i => i * 0.25).ToArray();
+		this.Roundtrip<double[], Witness>(values);
+	}
+
+	[Fact]
+	public void EnumArray_Ordinal()
+	{
+		// Enum arrays should use the hardware-accelerated path for ordinal serialization
+		TestEnum[] values = [TestEnum.A, TestEnum.B, TestEnum.C, TestEnum.A, TestEnum.C];
+		this.Roundtrip<TestEnum[], Witness>(values);
+	}
+
+	[Fact]
+	public void MixedIntArray_FallsBackToScalar()
+	{
+		// Mix of fixint, negative, and large values — must fall back to scalar read
+		int[] values = [0, 127, -1, -32, 128, 256, int.MaxValue, int.MinValue];
+		this.Roundtrip<int[], Witness>(values);
+	}
+
+#if NET
+	[Fact]
+	public async Task FloatArray_MultiSegment()
+	{
+		// Force multi-segment deserialization via async reader to exercise the pooled-buffer path
+		float[] values = Enumerable.Range(0, 500).Select(i => i * 1.5f).ToArray();
+		await this.RoundtripAsync<float[], Witness>(values);
+	}
+
+	[Fact]
+	public async Task DoubleArray_MultiSegment()
+	{
+		double[] values = Enumerable.Range(0, 500).Select(i => i * 2.5).ToArray();
+		await this.RoundtripAsync<double[], Witness>(values);
+	}
+
+	[Fact]
+	public async Task SmallIntArray_MultiSegment()
+	{
+		int[] values = Enumerable.Range(0, 500).Select(i => i % 128).ToArray();
+		await this.RoundtripAsync<int[], Witness>(values);
+	}
+#endif
+
+	public enum TestEnum
+	{
+		A = 0,
+		B = 1,
+		C = 2,
+	}
+
 	[GenerateShapeFor<bool[]>]
 	[GenerateShapeFor<Memory<bool>>]
 	[GenerateShapeFor<Memory<sbyte>>]
@@ -159,5 +230,9 @@ public partial class ArraysOfPrimitivesTests : MessagePackSerializerTestBase
 	[GenerateShapeFor<Memory<float>>]
 	[GenerateShapeFor<Memory<double>>]
 	[GenerateShapeFor<IEnumerable<int>>]
+	[GenerateShapeFor<int[]>]
+	[GenerateShapeFor<float[]>]
+	[GenerateShapeFor<double[]>]
+	[GenerateShapeFor<TestEnum[]>]
 	private partial class Witness;
 }

@@ -815,7 +815,7 @@ internal class StandardVisitor : TypeShapeVisitor, ITypeShapeFunc
 						CollectionConstructionStrategy.None => ConverterResult.Ok(new EnumerableConverter<TEnumerable, TElement>(getEnumerable, elementConverter)),
 						CollectionConstructionStrategy.Mutable => ConverterResult.Ok(new MutableEnumerableConverter<TEnumerable, TElement>(getEnumerable, elementConverter, enumerableShape.GetAppender(), enumerableShape.GetDefaultConstructor(), this.GetCollectionOptions(enumerableShape, memberInfluence))),
 #if NET
-						CollectionConstructionStrategy.Parameterized when !this.owner.DisableHardwareAcceleration && HardwareAccelerated.TryGetConverter<TEnumerable, TElement>(out MessagePackConverter<TEnumerable>? converter) => ConverterResult.Ok(converter),
+						CollectionConstructionStrategy.Parameterized when !this.owner.DisableHardwareAcceleration && HardwareAccelerated.TryGetConverter<TEnumerable, TElement>(out MessagePackConverter<TEnumerable>? converter, this.owner.SerializeEnumValuesByName) => ConverterResult.Ok(converter),
 #endif
 						CollectionConstructionStrategy.Parameterized when getEnumerable is not null && ArraysOfPrimitivesConverters.TryGetConverter(getEnumerable, enumerableShape.GetParameterizedConstructor(), out MessagePackConverter<TEnumerable>? converter) => ConverterResult.Ok(converter),
 						CollectionConstructionStrategy.Parameterized => ConverterResult.Ok(new SpanEnumerableConverter<TEnumerable, TElement>(getEnumerable, elementConverter, enumerableShape.GetParameterizedConstructor(), this.GetCollectionOptions(enumerableShape, memberInfluence))),
