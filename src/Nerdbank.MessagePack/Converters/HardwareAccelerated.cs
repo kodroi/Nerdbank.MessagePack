@@ -35,7 +35,7 @@ internal static class HardwareAccelerated
 	/// <typeparam name="TElement">The type of element.</typeparam>
 	/// <param name="converter">Receives the hardware-accelerated converter if one is available.</param>
 	/// <returns>A value indicating whether a converter is available.</returns>
-	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter, bool serializeEnumValuesByName)
+	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter)
 	{
 		Type enumerableType = typeof(TEnumerable);
 		SpanConstructorKind spanConstructorKind;
@@ -112,20 +112,55 @@ internal static class HardwareAccelerated
 			return true;
 		}
 
-		// Enums backed by integer types have identical memory layout to their underlying type.
-		// Only use this fast path for ordinal serialization — name-based serialization needs EnumAsStringConverter.
-		if (typeof(TElement).IsEnum && !serializeEnumValuesByName)
-		{
-			return TryGetConverterForUnderlyingType(typeof(TElement).GetEnumUnderlyingType(), spanConstructorKind, out converter);
-		}
+		// Enum detection is handled by the caller (StandardVisitor) which checks
+		// SerializeEnumValuesByName before calling TryGetEnumArrayConverter.
 
 		converter = null;
 		return false;
 	}
 
 	/// <summary>
+	/// Attempts to create a hardware-accelerated converter for an enum array
+	/// by treating elements as their underlying integer type.
+	/// Should only be called for ordinal serialization — name-based enums need EnumAsStringConverter.
+	/// </summary>
+	internal static bool TryGetEnumArrayConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter)
+	{
+		if (!typeof(TElement).IsEnum)
+		{
+			converter = null;
+			return false;
+		}
+
+		Type enumerableType = typeof(TEnumerable);
+		SpanConstructorKind spanConstructorKind;
+		if (enumerableType == typeof(TElement[]))
+		{
+			spanConstructorKind = SpanConstructorKind.Array;
+		}
+		else if (enumerableType == typeof(List<TElement>))
+		{
+			spanConstructorKind = SpanConstructorKind.List;
+		}
+		else if (enumerableType == typeof(ReadOnlyMemory<TElement>))
+		{
+			spanConstructorKind = SpanConstructorKind.ReadOnlyMemory;
+		}
+		else if (enumerableType == typeof(Memory<TElement>))
+		{
+			spanConstructorKind = SpanConstructorKind.Memory;
+		}
+		else
+		{
+			converter = null;
+			return false;
+		}
+
+		return TryGetConverterForUnderlyingType(typeof(TElement).GetEnumUnderlyingType(), spanConstructorKind, out converter);
+	}
+
+	/// <summary>
 	/// Creates a PrimitiveArrayConverter for the given underlying type.
-	/// Used by both direct primitive matching and enum-with-underlying-type matching.
 	/// </summary>
 	private static bool TryGetConverterForUnderlyingType<TEnumerable>(Type underlyingType, SpanConstructorKind spanConstructorKind, [NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter)
 	{
