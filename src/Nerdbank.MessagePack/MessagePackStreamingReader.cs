@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
+using System.Runtime.CompilerServices;
 using DecodeResult = Nerdbank.MessagePack.MessagePackPrimitives.DecodeResult;
 
 namespace Nerdbank.MessagePack;
@@ -134,6 +135,7 @@ public ref partial struct MessagePackStreamingReader
 	/// </summary>
 	/// <param name="code">When successful, receives the next msgpack byte.</param>
 	/// <returns>The success or error code.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryPeekNextCode(out byte code)
 	{
 		return this.reader.TryPeek(out code) ? DecodeResult.Success : this.InsufficientBytes;
@@ -164,6 +166,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <see cref="DecodeResult.TokenMismatch"/> if the token was not nil,
 	/// or other error codes if the buffer is incomplete.
 	/// </returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryReadNil()
 	{
 		if (this.reader.TryPeek(out byte next))
@@ -202,6 +205,7 @@ public ref partial struct MessagePackStreamingReader
 	/// </summary>
 	/// <param name="value">The decoded value if the read was successful.</param>
 	/// <returns>The success or error code.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out bool value)
 	{
 		if (this.reader.TryPeek(out byte next))

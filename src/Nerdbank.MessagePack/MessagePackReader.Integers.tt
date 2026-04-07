@@ -11,6 +11,8 @@
 #pragma warning disable SA1121 // Simplify type syntax
 #pragma warning disable SA1601 // Partial elements should be documented
 
+using System.Runtime.CompilerServices;
+
 namespace Nerdbank.MessagePack;
 
 public ref partial struct MessagePackReader
@@ -42,6 +44,7 @@ foreach (var intType in allTypes) {
 	/// </summary>
 	/// <returns>The value.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public <#=intType.Name#> Read<#=intType.Name#>()
 	{
 		switch (this.streamingReader.TryRead(out <#=intType.Name#> value))

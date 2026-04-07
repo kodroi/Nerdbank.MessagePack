@@ -9,6 +9,7 @@
 #pragma warning disable SA1121 // Simplify type syntax
 #pragma warning disable SA1601 // Partial elements should be documented
 
+using System.Runtime.CompilerServices;
 using DecodeResult = Nerdbank.MessagePack.MessagePackPrimitives.DecodeResult;
 
 namespace Nerdbank.MessagePack;
@@ -24,6 +25,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <param name="value">Receives the decoded value.</param>
 	/// <returns>The success or error code.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out Byte value)
 	{
 		DecodeResult readResult = MessagePackPrimitives.TryRead(this.reader.UnreadSpan, out value, out int tokenSize);
@@ -72,6 +74,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <param name="value">Receives the decoded value.</param>
 	/// <returns>The success or error code.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out UInt16 value)
 	{
 		DecodeResult readResult = MessagePackPrimitives.TryRead(this.reader.UnreadSpan, out value, out int tokenSize);
@@ -120,6 +123,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <param name="value">Receives the decoded value.</param>
 	/// <returns>The success or error code.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out UInt32 value)
 	{
 		DecodeResult readResult = MessagePackPrimitives.TryRead(this.reader.UnreadSpan, out value, out int tokenSize);
@@ -168,6 +172,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <param name="value">Receives the decoded value.</param>
 	/// <returns>The success or error code.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out UInt64 value)
 	{
 		DecodeResult readResult = MessagePackPrimitives.TryRead(this.reader.UnreadSpan, out value, out int tokenSize);
@@ -216,6 +221,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <param name="value">Receives the decoded value.</param>
 	/// <returns>The success or error code.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out SByte value)
 	{
 		DecodeResult readResult = MessagePackPrimitives.TryRead(this.reader.UnreadSpan, out value, out int tokenSize);
@@ -264,6 +270,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <param name="value">Receives the decoded value.</param>
 	/// <returns>The success or error code.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out Int16 value)
 	{
 		DecodeResult readResult = MessagePackPrimitives.TryRead(this.reader.UnreadSpan, out value, out int tokenSize);
@@ -312,6 +319,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <param name="value">Receives the decoded value.</param>
 	/// <returns>The success or error code.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out Int32 value)
 	{
 		DecodeResult readResult = MessagePackPrimitives.TryRead(this.reader.UnreadSpan, out value, out int tokenSize);
@@ -360,6 +368,7 @@ public ref partial struct MessagePackStreamingReader
 	/// <param name="value">Receives the decoded value.</param>
 	/// <returns>The success or error code.</returns>
 	/// <exception cref="OverflowException">Thrown when the value exceeds what can be stored in the returned type.</exception>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public DecodeResult TryRead(out Int64 value)
 	{
 		DecodeResult readResult = MessagePackPrimitives.TryRead(this.reader.UnreadSpan, out value, out int tokenSize);
