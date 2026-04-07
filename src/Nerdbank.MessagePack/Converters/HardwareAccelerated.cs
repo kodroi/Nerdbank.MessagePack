@@ -230,12 +230,12 @@ internal static class HardwareAccelerated
 		/// </param>
 		/// <param name="inputLength">The number of elements to decode.</param>
 		/// <returns><see langword="true" /> if the values in <paramref name="msgpack"/> were all valid; otherwise, <see langword="false" />.</returns>
-		internal static bool ReadPositiveFixInt<T>(ref T output, in byte msgpack, int count)
-			where T : unmanaged
+		/// <summary>
+		/// Checks whether all bytes in a span are positive fixint values (0x00-0x7F).
+		/// </summary>
+		internal static bool AllPositiveFixInt(in byte msgpack, int count)
 		{
 			ref byte input = ref Unsafe.AsRef(in msgpack);
-
-			// Validate all bytes are <= 0x7F
 			int i = 0;
 			if (Vector.IsHardwareAccelerated)
 			{
@@ -253,40 +253,6 @@ internal static class HardwareAccelerated
 				if (Unsafe.Add(ref input, i) > 0x7F)
 				{
 					return false;
-				}
-			}
-
-			// Widen bytes to target type
-			for (i = 0; i < count; i++)
-			{
-				byte b = Unsafe.Add(ref input, i);
-				if (typeof(T) == typeof(sbyte))
-				{
-					Unsafe.As<T, sbyte>(ref Unsafe.Add(ref output, i)) = (sbyte)b;
-				}
-				else if (typeof(T) == typeof(short))
-				{
-					Unsafe.As<T, short>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(int))
-				{
-					Unsafe.As<T, int>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(long))
-				{
-					Unsafe.As<T, long>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(ushort))
-				{
-					Unsafe.As<T, ushort>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(uint))
-				{
-					Unsafe.As<T, uint>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(ulong))
-				{
-					Unsafe.As<T, ulong>(ref Unsafe.Add(ref output, i)) = b;
 				}
 			}
 
@@ -1046,13 +1012,52 @@ internal static class HardwareAccelerated
 				return TryBatchReadFixed(ref reader, MemoryMarshal.Cast<TElement, double>(span), count, 9, MessagePackPrimitiveSpanUtility.ReadFloat64);
 			}
 
-			// Integer types: try fixint batch path (each element is 1 byte, value 0x00-0x7F)
-			if (typeof(TElement) == typeof(int) || typeof(TElement) == typeof(long) ||
-				typeof(TElement) == typeof(short) || typeof(TElement) == typeof(sbyte) ||
-				typeof(TElement) == typeof(uint) || typeof(TElement) == typeof(ulong) ||
-				typeof(TElement) == typeof(ushort))
+			// Integer types: try fixint batch path (each element is 1 byte, value 0x00-0x7F).
+			// Fixint bytes ARE the value. Zero the span, then write each byte at offset 0
+			// of each element (works on little-endian; on big-endian, write at last byte).
 			{
-				return TryBatchReadFixed(ref reader, span, count, 1, MessagePackPrimitiveSpanUtility.ReadPositiveFixInt);
+				SequencePosition checkpoint = reader.Position;
+				RawMessagePack sequence = reader.ReadRaw(count);
+				ReadOnlySpan<byte> raw;
+				byte[]? rented = null;
+				if (sequence.MsgPack.IsSingleSegment)
+				{
+					raw = sequence.MsgPack.FirstSpan;
+				}
+				else
+				{
+					rented = ArrayPool<byte>.Shared.Rent(count);
+					sequence.MsgPack.CopyTo(rented);
+					raw = rented.AsSpan(0, count);
+				}
+
+				try
+				{
+					if (!MessagePackPrimitiveSpanUtility.AllPositiveFixInt(in MemoryMarshal.GetReference(raw), count))
+					{
+						reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
+						return false;
+					}
+
+					// Zero the target span then write each fixint byte at the low byte of each element.
+					MemoryMarshal.AsBytes(span).Clear();
+					int stride = Unsafe.SizeOf<TElement>();
+					ref byte dest = ref MemoryMarshal.GetReference(MemoryMarshal.AsBytes(span));
+					int offset = BitConverter.IsLittleEndian ? 0 : stride - 1;
+					for (int i = 0; i < count; i++)
+					{
+						Unsafe.Add(ref dest, (i * stride) + offset) = raw[i];
+					}
+
+					return true;
+				}
+				finally
+				{
+					if (rented is not null)
+					{
+						ArrayPool<byte>.Shared.Return(rented);
+					}
+				}
 			}
 
 			return false;
