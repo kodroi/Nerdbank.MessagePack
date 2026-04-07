@@ -35,8 +35,11 @@ internal static class HardwareAccelerated
 	/// <typeparam name="TElement">The type of element.</typeparam>
 	/// <param name="converter">Receives the hardware-accelerated converter if one is available.</param>
 	/// <returns>A value indicating whether a converter is available.</returns>
-	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter)
+	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter, bool allowEnums = false)
 	{
+		// For enums, match on the underlying integer type instead.
+		Type elementType = typeof(TElement).IsEnum && allowEnums ? typeof(TElement).GetEnumUnderlyingType() : typeof(TElement);
+
 		Type enumerableType = typeof(TEnumerable);
 		SpanConstructorKind spanConstructorKind;
 		if (enumerableType == typeof(TElement[]))
@@ -61,148 +64,59 @@ internal static class HardwareAccelerated
 			return false;
 		}
 
-		if (typeof(TElement) == typeof(bool))
+		if (elementType == typeof(bool))
 		{
 			converter = new BoolArrayConverter<TEnumerable>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(sbyte))
+		else if (elementType == typeof(sbyte))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, sbyte>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(short))
+		else if (elementType == typeof(short))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, short>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(int))
+		else if (elementType == typeof(int))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, int>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(long))
+		else if (elementType == typeof(long))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, long>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(ushort))
+		else if (elementType == typeof(ushort))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, ushort>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(uint))
+		else if (elementType == typeof(uint))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, uint>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(ulong))
+		else if (elementType == typeof(ulong))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, ulong>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(float))
+		else if (elementType == typeof(float))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, float>(spanConstructorKind);
 			return true;
 		}
-		else if (typeof(TElement) == typeof(double))
+		else if (elementType == typeof(double))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, double>(spanConstructorKind);
 			return true;
 		}
 
-		// Enum detection is handled by the caller (StandardVisitor) which checks
-		// SerializeEnumValuesByName before calling TryGetEnumArrayConverter.
-
 		converter = null;
 		return false;
-	}
-
-	/// <summary>
-	/// Attempts to create a hardware-accelerated converter for an enum array
-	/// by treating elements as their underlying integer type.
-	/// Should only be called for ordinal serialization — name-based enums need EnumAsStringConverter.
-	/// </summary>
-	internal static bool TryGetEnumArrayConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter)
-	{
-		if (!typeof(TElement).IsEnum)
-		{
-			converter = null;
-			return false;
-		}
-
-		Type enumerableType = typeof(TEnumerable);
-		SpanConstructorKind spanConstructorKind;
-		if (enumerableType == typeof(TElement[]))
-		{
-			spanConstructorKind = SpanConstructorKind.Array;
-		}
-		else if (enumerableType == typeof(List<TElement>))
-		{
-			spanConstructorKind = SpanConstructorKind.List;
-		}
-		else if (enumerableType == typeof(ReadOnlyMemory<TElement>))
-		{
-			spanConstructorKind = SpanConstructorKind.ReadOnlyMemory;
-		}
-		else if (enumerableType == typeof(Memory<TElement>))
-		{
-			spanConstructorKind = SpanConstructorKind.Memory;
-		}
-		else
-		{
-			converter = null;
-			return false;
-		}
-
-		return TryGetConverterForUnderlyingType(typeof(TElement).GetEnumUnderlyingType(), spanConstructorKind, out converter);
-	}
-
-	/// <summary>
-	/// Creates a PrimitiveArrayConverter for the given underlying type.
-	/// </summary>
-	private static bool TryGetConverterForUnderlyingType<TEnumerable>(Type underlyingType, SpanConstructorKind spanConstructorKind, [NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter)
-	{
-		if (underlyingType == typeof(sbyte))
-		{
-			converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, sbyte>(spanConstructorKind);
-		}
-		else if (underlyingType == typeof(short))
-		{
-			converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, short>(spanConstructorKind);
-		}
-		else if (underlyingType == typeof(int))
-		{
-			converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, int>(spanConstructorKind);
-		}
-		else if (underlyingType == typeof(long))
-		{
-			converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, long>(spanConstructorKind);
-		}
-		else if (underlyingType == typeof(byte))
-		{
-			converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, byte>(spanConstructorKind);
-		}
-		else if (underlyingType == typeof(ushort))
-		{
-			converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, ushort>(spanConstructorKind);
-		}
-		else if (underlyingType == typeof(uint))
-		{
-			converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, uint>(spanConstructorKind);
-		}
-		else if (underlyingType == typeof(ulong))
-		{
-			converter = (MessagePackConverter<TEnumerable>)(object)new PrimitiveArrayConverter<TEnumerable, ulong>(spanConstructorKind);
-		}
-		else
-		{
-			converter = null;
-			return false;
-		}
-
-		return true;
 	}
 
 	private static ref TElement GetReferenceAndLength<TEnumerable, TElement>(SpanConstructorKind spanConstructorKind, TEnumerable enumerable, out int length)
@@ -315,17 +229,6 @@ internal static class HardwareAccelerated
 		/// </param>
 		/// <param name="inputLength">The number of elements to decode.</param>
 		/// <returns><see langword="true" /> if the values in <paramref name="msgpack"/> were all valid; otherwise, <see langword="false" />.</returns>
-		/// <summary>
-		/// Decodes a span of msgpack-encoded float32 values.
-		/// </summary>
-		/// <param name="output">The reference to the first element in a span where the decoded values should be written.</param>
-		/// <param name="msgpack">A reference to the first msgpack byte to decode.</param>
-		/// <param name="count">The number of elements to decode.</param>
-		/// <returns><see langword="true" /> if the values in <paramref name="msgpack"/> were all valid float32 msgpack values; otherwise, <see langword="false" />.</returns>
-		/// <summary>
-		/// Decodes a span of positive fixint values (0x00-0x7F), widening each byte to the target integer type.
-		/// </summary>
-		/// <returns><see langword="true" /> if all bytes are positive fixint; otherwise, <see langword="false" />.</returns>
 		internal static bool ReadPositiveFixInt<T>(ref T output, in byte msgpack, int count)
 			where T : unmanaged
 		{
@@ -390,48 +293,36 @@ internal static class HardwareAccelerated
 		}
 
 		internal static bool ReadFloat32(ref float output, in byte msgpack, int count)
-			=> ReadFixedWidthFloat<float, uint>(ref output, in msgpack, count, MessagePackCode.Float32, 5);
-
-		internal static bool ReadFloat64(ref double output, in byte msgpack, int count)
-			=> ReadFixedWidthFloat<double, ulong>(ref output, in msgpack, count, MessagePackCode.Float64, 9);
-
-		/// <summary>
-		/// Generic batch decoder for fixed-width float types (float32/float64).
-		/// Validates the type prefix byte, reads the big-endian payload, byte-swaps, and stores.
-		/// </summary>
-		private static bool ReadFixedWidthFloat<TFloat, TRaw>(ref TFloat output, in byte msgpack, int count, byte expectedCode, nuint bytesPerElement)
-			where TFloat : unmanaged
-			where TRaw : unmanaged
 		{
 			ref byte input = ref Unsafe.AsRef(in msgpack);
 			for (int i = 0; i < count; i++)
 			{
-				nuint offset = unchecked((nuint)i) * bytesPerElement;
-				if (Unsafe.Add(ref input, offset) != expectedCode)
+				nuint offset = unchecked((nuint)i) * 5U;
+				if (Unsafe.Add(ref input, offset) != MessagePackCode.Float32)
 				{
 					return false;
 				}
 
-				if (typeof(TRaw) == typeof(uint))
-				{
-					uint raw = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref input, offset + 1U));
-					if (BitConverter.IsLittleEndian)
-					{
-						raw = BinaryPrimitives.ReverseEndianness(raw);
-					}
+				uint raw = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref input, offset + 1U));
+				Unsafe.Add(ref output, i) = Unsafe.BitCast<uint, float>(BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(raw) : raw);
+			}
 
-					Unsafe.Add(ref output, i) = Unsafe.BitCast<uint, TFloat>(raw);
-				}
-				else
-				{
-					ulong raw = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref input, offset + 1U));
-					if (BitConverter.IsLittleEndian)
-					{
-						raw = BinaryPrimitives.ReverseEndianness(raw);
-					}
+			return true;
+		}
 
-					Unsafe.Add(ref output, i) = Unsafe.BitCast<ulong, TFloat>(raw);
+		internal static bool ReadFloat64(ref double output, in byte msgpack, int count)
+		{
+			ref byte input = ref Unsafe.AsRef(in msgpack);
+			for (int i = 0; i < count; i++)
+			{
+				nuint offset = unchecked((nuint)i) * 9U;
+				if (Unsafe.Add(ref input, offset) != MessagePackCode.Float64)
+				{
+					return false;
 				}
+
+				ulong raw = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref input, offset + 1U));
+				Unsafe.Add(ref output, i) = Unsafe.BitCast<ulong, double>(BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(raw) : raw);
 			}
 
 			return true;
