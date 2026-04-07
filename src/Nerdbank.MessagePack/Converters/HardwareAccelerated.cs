@@ -232,81 +232,6 @@ internal static class HardwareAccelerated
 		/// <param name="msgpack">A reference to the first msgpack byte to decode.</param>
 		/// <param name="count">The number of elements to decode.</param>
 		/// <returns><see langword="true" /> if the values in <paramref name="msgpack"/> were all valid float32 msgpack values; otherwise, <see langword="false" />.</returns>
-		/// <summary>
-		/// Checks whether all bytes in a span are positive fixint values (0x00-0x7F).
-		/// </summary>
-		/// <param name="msgpack">A reference to the first msgpack byte.</param>
-		/// <param name="count">The number of bytes to check.</param>
-		/// <returns><see langword="true" /> if all bytes are in the 0x00-0x7F range; otherwise, <see langword="false" />.</returns>
-		internal static bool AllPositiveFixInt(in byte msgpack, int count)
-		{
-			ref byte input = ref Unsafe.AsRef(in msgpack);
-			int i = 0;
-			if (Vector.IsHardwareAccelerated)
-			{
-				for (; i + Vector<byte>.Count <= count; i += Vector<byte>.Count)
-				{
-					Vector<byte> loaded = Vector.LoadUnsafe(ref input, unchecked((nuint)i));
-					if (Vector.GreaterThanAny(loaded, new Vector<byte>(0x7F)))
-					{
-						return false;
-					}
-				}
-			}
-
-			for (; i < count; i++)
-			{
-				if (Unsafe.Add(ref input, i) > 0x7F)
-				{
-					return false;
-				}
-			}
-
-			return true;
-		}
-
-		/// <summary>
-		/// Widens a span of bytes (positive fixint values) to a wider integer type.
-		/// Caller must ensure all bytes are in 0x00-0x7F range.
-		/// </summary>
-		internal static void WidenFixInt<T>(ref T output, in byte input, int count)
-			where T : unmanaged
-		{
-			ref byte src = ref Unsafe.AsRef(in input);
-			for (int i = 0; i < count; i++)
-			{
-				byte b = Unsafe.Add(ref src, i);
-				if (typeof(T) == typeof(sbyte))
-				{
-					Unsafe.As<T, sbyte>(ref Unsafe.Add(ref output, i)) = (sbyte)b;
-				}
-				else if (typeof(T) == typeof(short))
-				{
-					Unsafe.As<T, short>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(int))
-				{
-					Unsafe.As<T, int>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(long))
-				{
-					Unsafe.As<T, long>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(ushort))
-				{
-					Unsafe.As<T, ushort>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(uint))
-				{
-					Unsafe.As<T, uint>(ref Unsafe.Add(ref output, i)) = b;
-				}
-				else if (typeof(T) == typeof(ulong))
-				{
-					Unsafe.As<T, ulong>(ref Unsafe.Add(ref output, i)) = b;
-				}
-			}
-		}
-
 		internal static bool ReadFloat32(ref float output, in byte msgpack, int count)
 		{
 			ref byte input = ref Unsafe.AsRef(in msgpack);
@@ -1101,30 +1026,6 @@ internal static class HardwareAccelerated
 					}
 
 					doubleSpan = doubleSpan[elementsInSegment..];
-				}
-
-				return true;
-			}
-
-			// For integer types, try fixint batch path (each element is 1 byte, value 0x00-0x7F)
-			if (typeof(TElement) == typeof(int) || typeof(TElement) == typeof(long) ||
-				typeof(TElement) == typeof(short) || typeof(TElement) == typeof(sbyte) ||
-				typeof(TElement) == typeof(uint) || typeof(TElement) == typeof(ulong) ||
-				typeof(TElement) == typeof(ushort))
-			{
-				SequencePosition checkpoint = reader.Position;
-				RawMessagePack sequence = reader.ReadRaw(count);
-				Span<TElement> remaining = span;
-				foreach (ReadOnlyMemory<byte> segment in sequence.MsgPack)
-				{
-					if (!MessagePackPrimitiveSpanUtility.AllPositiveFixInt(in MemoryMarshal.GetReference(segment.Span), segment.Length))
-					{
-						reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
-						return false;
-					}
-
-					MessagePackPrimitiveSpanUtility.WidenFixInt(ref MemoryMarshal.GetReference(remaining), in MemoryMarshal.GetReference(segment.Span), segment.Length);
-					remaining = remaining[segment.Length..];
 				}
 
 				return true;
