@@ -3,7 +3,6 @@
 
 #if NET
 
-using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
@@ -37,10 +36,6 @@ internal static class HardwareAccelerated
 	/// <returns>A value indicating whether a converter is available.</returns>
 	internal static bool TryGetConverter<TEnumerable, TElement>([NotNullWhen(true)] out MessagePackConverter<TEnumerable>? converter)
 	{
-		// For enums, match on the underlying integer type (caller is responsible
-		// for not calling this when name-based enum serialization is configured).
-		Type elementType = typeof(TElement).IsEnum ? typeof(TElement).GetEnumUnderlyingType() : typeof(TElement);
-
 		Type enumerableType = typeof(TEnumerable);
 		SpanConstructorKind spanConstructorKind;
 		if (enumerableType == typeof(TElement[]))
@@ -65,52 +60,52 @@ internal static class HardwareAccelerated
 			return false;
 		}
 
-		if (elementType == typeof(bool))
+		if (typeof(TElement) == typeof(bool))
 		{
 			converter = new BoolArrayConverter<TEnumerable>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(sbyte))
+		else if (typeof(TElement) == typeof(sbyte))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, sbyte>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(short))
+		else if (typeof(TElement) == typeof(short))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, short>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(int))
+		else if (typeof(TElement) == typeof(int))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, int>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(long))
+		else if (typeof(TElement) == typeof(long))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, long>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(ushort))
+		else if (typeof(TElement) == typeof(ushort))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, ushort>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(uint))
+		else if (typeof(TElement) == typeof(uint))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, uint>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(ulong))
+		else if (typeof(TElement) == typeof(ulong))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, ulong>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(float))
+		else if (typeof(TElement) == typeof(float))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, float>(spanConstructorKind);
 			return true;
 		}
-		else if (elementType == typeof(double))
+		else if (typeof(TElement) == typeof(double))
 		{
 			converter = new PrimitiveArrayConverter<TEnumerable, double>(spanConstructorKind);
 			return true;
@@ -230,71 +225,6 @@ internal static class HardwareAccelerated
 		/// </param>
 		/// <param name="inputLength">The number of elements to decode.</param>
 		/// <returns><see langword="true" /> if the values in <paramref name="msgpack"/> were all valid; otherwise, <see langword="false" />.</returns>
-		/// <summary>
-		/// Checks whether all bytes in a span are positive fixint values (0x00-0x7F).
-		/// </summary>
-		internal static bool AllPositiveFixInt(in byte msgpack, int count)
-		{
-			ref byte input = ref Unsafe.AsRef(in msgpack);
-			int i = 0;
-			if (Vector.IsHardwareAccelerated)
-			{
-				for (; i + Vector<byte>.Count <= count; i += Vector<byte>.Count)
-				{
-					if (Vector.GreaterThanAny(Vector.LoadUnsafe(ref input, unchecked((nuint)i)), new Vector<byte>(0x7F)))
-					{
-						return false;
-					}
-				}
-			}
-
-			for (; i < count; i++)
-			{
-				if (Unsafe.Add(ref input, i) > 0x7F)
-				{
-					return false;
-				}
-			}
-
-			return true;
-		}
-
-		internal static bool ReadFloat32(ref float output, in byte msgpack, int count)
-		{
-			ref byte input = ref Unsafe.AsRef(in msgpack);
-			for (int i = 0; i < count; i++)
-			{
-				nuint offset = unchecked((nuint)i) * 5U;
-				if (Unsafe.Add(ref input, offset) != MessagePackCode.Float32)
-				{
-					return false;
-				}
-
-				uint raw = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref input, offset + 1U));
-				Unsafe.Add(ref output, i) = Unsafe.BitCast<uint, float>(BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(raw) : raw);
-			}
-
-			return true;
-		}
-
-		internal static bool ReadFloat64(ref double output, in byte msgpack, int count)
-		{
-			ref byte input = ref Unsafe.AsRef(in msgpack);
-			for (int i = 0; i < count; i++)
-			{
-				nuint offset = unchecked((nuint)i) * 9U;
-				if (Unsafe.Add(ref input, offset) != MessagePackCode.Float64)
-				{
-					return false;
-				}
-
-				ulong raw = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref input, offset + 1U));
-				Unsafe.Add(ref output, i) = Unsafe.BitCast<ulong, double>(BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(raw) : raw);
-			}
-
-			return true;
-		}
-
 		internal static bool Read(ref bool output, in byte msgpack, int inputLength)
 		{
 			ref byte input = ref Unsafe.AsRef(in msgpack);
@@ -988,133 +918,6 @@ internal static class HardwareAccelerated
 					break;
 			}
 
-			if (!TryBatchRead(ref reader, span, count))
-			{
-				ReadElementwise(ref reader, span);
-			}
-
-			return enumerable;
-		}
-
-		/// <summary>
-		/// Attempts a fast batch read for types with predictable encoding sizes.
-		/// Returns false if the encoding is not uniform, restoring the reader position.
-		/// </summary>
-		private static bool TryBatchRead(ref MessagePackReader reader, Span<TElement> span, int count)
-		{
-			if (typeof(TElement) == typeof(float))
-			{
-				return TryBatchReadFixed(ref reader, MemoryMarshal.Cast<TElement, float>(span), count, 5, MessagePackPrimitiveSpanUtility.ReadFloat32);
-			}
-
-			if (typeof(TElement) == typeof(double))
-			{
-				return TryBatchReadFixed(ref reader, MemoryMarshal.Cast<TElement, double>(span), count, 9, MessagePackPrimitiveSpanUtility.ReadFloat64);
-			}
-
-			// Integer types: try fixint batch path (each element is 1 byte, value 0x00-0x7F).
-			// Fixint bytes ARE the value. Zero the span, then write each byte at offset 0
-			// of each element (works on little-endian; on big-endian, write at last byte).
-			{
-				SequencePosition checkpoint = reader.Position;
-				RawMessagePack sequence = reader.ReadRaw(count);
-				ReadOnlySpan<byte> raw;
-				byte[]? rented = null;
-				if (sequence.MsgPack.IsSingleSegment)
-				{
-					raw = sequence.MsgPack.FirstSpan;
-				}
-				else
-				{
-					rented = ArrayPool<byte>.Shared.Rent(count);
-					sequence.MsgPack.CopyTo(rented);
-					raw = rented.AsSpan(0, count);
-				}
-
-				try
-				{
-					if (!MessagePackPrimitiveSpanUtility.AllPositiveFixInt(in MemoryMarshal.GetReference(raw), count))
-					{
-						reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
-						return false;
-					}
-
-					// Zero the target span then write each fixint byte at the low byte of each element.
-					MemoryMarshal.AsBytes(span).Clear();
-					int stride = Unsafe.SizeOf<TElement>();
-					ref byte dest = ref MemoryMarshal.GetReference(MemoryMarshal.AsBytes(span));
-					int offset = BitConverter.IsLittleEndian ? 0 : stride - 1;
-					for (int i = 0; i < count; i++)
-					{
-						Unsafe.Add(ref dest, (i * stride) + offset) = raw[i];
-					}
-
-					return true;
-				}
-				finally
-				{
-					if (rented is not null)
-					{
-						ArrayPool<byte>.Shared.Return(rented);
-					}
-				}
-			}
-
-			return false;
-		}
-
-		/// <summary>
-		/// Common batch read implementation for fixed-size-per-element encodings.
-		/// Reads <paramref name="count"/> * <paramref name="bytesPerElement"/> raw bytes,
-		/// validates and decodes via <paramref name="decoder"/>, and restores the reader on failure.
-		/// </summary>
-		private delegate bool BatchDecoder<T>(ref T output, in byte msgpack, int count);
-
-		private static bool TryBatchReadFixed<T>(ref MessagePackReader reader, Span<T> span, int count, int bytesPerElement, BatchDecoder<T> decoder)
-		{
-			SequencePosition checkpoint = reader.Position;
-			long totalBytes = (long)count * bytesPerElement;
-			RawMessagePack sequence = reader.ReadRaw(totalBytes);
-
-			// Fast path: single contiguous segment (common case)
-			if (sequence.MsgPack.IsSingleSegment)
-			{
-				if (!decoder(ref MemoryMarshal.GetReference(span), in MemoryMarshal.GetReference(sequence.MsgPack.FirstSpan), count))
-				{
-					reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
-					return false;
-				}
-
-				return true;
-			}
-
-			// Multi-segment: copy to contiguous buffer to avoid split-element bugs.
-			// ReadOnlySequence segments can split mid-element (e.g. a float's 5 bytes
-			// across two segments), so we can't process per-segment.
-			byte[] buffer = ArrayPool<byte>.Shared.Rent((int)totalBytes);
-			try
-			{
-				sequence.MsgPack.CopyTo(buffer);
-				if (!decoder(ref MemoryMarshal.GetReference(span), in MemoryMarshal.GetReference(buffer.AsSpan()), count))
-				{
-					reader = new MessagePackReader(reader.Sequence.Slice(checkpoint));
-					return false;
-				}
-
-				return true;
-			}
-			finally
-			{
-				ArrayPool<byte>.Shared.Return(buffer);
-			}
-		}
-
-		/// <summary>
-		/// Reads elements one at a time through the standard MessagePackReader path.
-		/// Handles all element types and mixed encodings.
-		/// </summary>
-		private static void ReadElementwise(ref MessagePackReader reader, Span<TElement> span)
-		{
 			for (int i = 0; i < span.Length; i++)
 			{
 				if (typeof(TElement) == typeof(ushort))
@@ -1154,6 +957,8 @@ internal static class HardwareAccelerated
 					Unsafe.As<TElement, double>(ref span[i]) = reader.ReadDouble();
 				}
 			}
+
+			return enumerable;
 		}
 
 		/// <inheritdoc/>
